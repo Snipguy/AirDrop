@@ -1,6 +1,7 @@
 from flask import Flask, request, redirect, url_for, session, jsonify
 from werkzeug.utils import secure_filename
-import re, secrets, webbrowser, pyperclip, os
+import re, secrets, webbrowser, pyperclip, os, qrcode
+from flask_socketio import SocketIO, emit
 
 
 
@@ -9,12 +10,23 @@ app.secret_key = secrets.token_hex(32)
 
 PASSWORD = input("Set session password: ")
 UPLOAD_FOLDER = r"C:\Users\Babak\Downloads\AriDrop"
+socketio = SocketIO(app)
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 
+
+
 # ---------------- LOGIN ----------------
+@app.route("/qr")
+def qr():
+    ip = "10.152.59.118:5000"
+    img = qrcode.make(f"http://{ip}")
+    img.save("qr.png")
+    return "QR Generated. Open qr.png"
+
+
 @app.route("/", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -120,47 +132,108 @@ def send_page():
 
             <div class="msg" id="message"></div>
         </div>
+        <div id="dropZone" style="
+            border:2px dashed #555;
+            padding:40px;
+            text-align:center;
+            border-radius:15px;
+            margin-top:15px;">
+            Drag & Drop File Here
+        </div>
 
-<script>
-function sendText(){
-    fetch("/api/send_text", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({text: document.getElementById("text").value})
-    })
-    .then(res => res.json())
-    .then(data => {
-        document.getElementById("message").innerText = data.message;
-        document.getElementById("text").value = "";
-    });
-}
+                <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+        <script>
+        var socket = io();
 
-function uploadFile(){
-    let file = document.getElementById("fileInput").files[0];
-    let formData = new FormData();
-    formData.append("file", file);
+        function sendText(){
+            let text = document.getElementById("text").value;
+            socket.emit("send_message", {text: text});
+            document.getElementById("text").value = "";
+        }
 
-    fetch("/api/upload", {
-        method: "POST",
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        document.getElementById("message").innerText = data.message;
-    });
-}
+        socket.on("receive_message", function(data){
+            document.getElementById("message").innerText = "Received: " + data.text;
+        });
+        </script>
 
-function logout(){
-    window.location.href = "/logout";
-}
-</script>
+        <script>
+        function sendText(){
+            fetch("/api/send_text", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({text: document.getElementById("text").value})
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("message").innerText = data.message;
+                document.getElementById("text").value = "";
+            });
+        }
 
+        function uploadFile(){
+            let file = document.getElementById("fileInput").files[0];
+            let formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/api/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("message").innerText = data.message;
+            });
+        }
+
+        let dropZone = document.getElementById("dropZone");
+
+        dropZone.addEventListener("dragover", function(e){
+            e.preventDefault();
+            dropZone.style.background = "#333";
+        });
+
+        dropZone.addEventListener("dragleave", function(e){
+            dropZone.style.background = "";
+        });
+
+        dropZone.addEventListener("drop", function(e){
+            e.preventDefault();
+            let file = e.dataTransfer.files[0];
+            uploadFile(file);
+        });
+
+        function uploadFile(file){
+            let formData = new FormData();
+            formData.append("file", file);
+
+            fetch("/api/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("message").innerText = data.message;
+            });
+        }
+
+        function logout(){
+            window.location.href = "/logout";
+        }
+        </script>
     </body>
-    </html>
-    '''
+</html>
+'''
 
 
 # ---------------- TEXT API ----------------
+@socketio.on("send_message")
+def handle_message(data):
+    text = data["text"]
+
+    pyperclip.copy(text)
+    socketio.emit("receive_message", {"text": text}, broadcast=True)
+
+
 @app.route("/api/send_text", methods=["POST"])
 def api_send_text():
     if not session.get("logged_in"):
@@ -209,4 +282,11 @@ def logout():
     return redirect(url_for("login"))
 
 
-app.run(host="10.152.59.118", port=5000, debug=True)
+
+# app.run(host="10.152.59.118", port=5000, debug=True)
+# socketio.run(app, host="10.152.59.118", port=5000)
+socketio.run(app,
+             host="10.152.59.118",
+             port=5000,
+             certfile="cert.pem",
+             keyfile="key.pem")
