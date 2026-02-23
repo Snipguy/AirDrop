@@ -1,3 +1,4 @@
+import socket
 from flask import Flask, request, redirect, url_for, session, jsonify, abort, send_file
 from flask_socketio import SocketIO, emit
 import pyperclip
@@ -102,34 +103,58 @@ def connect():
 def login():
     if request.method == "POST":
         password = request.form.get("password")
-        if password == app.secret_key:
+
+        if password == APP_PIN:
             session["logged_in"] = True
             return redirect(url_for("send_page"))
         else:
-            return "Wrong password"
+            return "Wrong PIN"
+
     return '''
     <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body { font-family: 'Segoe UI', sans-serif; background:#121212; color:white; text-align:center; padding:40px;}
-            .card { background:#1e1e1e; padding:30px; border-radius:20px; box-shadow:0 0 25px rgba(0,0,0,0.6);}
-            input, button { width:100%; padding:15px; margin-top:10px; border-radius:12px; border:none; font-size:18px;}
-            button { font-weight:bold; }
-            button:hover { opacity:0.85; transition:0.2s; }
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <h2>Login</h2>
-            <form method="POST">
-                <input type="password" name="password" placeholder="Enter password">
-                <button type="submit">Login</button>
-            </form>
-        </div>
+    <body style="background:#121212;color:white;text-align:center;padding:40px;">
+        <h2>Enter PIN</h2>
+        <form method="POST">
+            <input type="password" name="password" placeholder="Enter PIN">
+            <button type="submit">Unlock</button>
+        </form>
     </body>
     </html>
     '''
+
+
+# @app.route("/", methods=["GET", "POST"])
+# def login():
+#     if request.method == "POST":
+#         password = request.form.get("password")
+#         if password == app.secret_key:
+#             session["logged_in"] = True
+#             return redirect(url_for("send_page"))
+#         else:
+#             return "Wrong password"
+#     return '''
+#     <html>
+#     <head>
+#         <meta name="viewport" content="width=device-width, initial-scale=1">
+#         <style>
+#             body { font-family: 'Segoe UI', sans-serif; background:#121212; color:white; text-align:center; padding:40px;}
+#             .card { background:#1e1e1e; padding:30px; border-radius:20px; box-shadow:0 0 25px rgba(0,0,0,0.6);}
+#             input, button { width:100%; padding:15px; margin-top:10px; border-radius:12px; border:none; font-size:18px;}
+#             button { font-weight:bold; }
+#             button:hover { opacity:0.85; transition:0.2s; }
+#         </style>
+#     </head>
+#     <body>
+#         <div class="card">
+#             <h2>Login</h2>
+#             <form method="POST">
+#                 <input type="password" name="password" placeholder="Enter password">
+#                 <button type="submit">Login</button>
+#             </form>
+#         </div>
+#     </body>
+#     </html>
+#     '''
 
 # ---------------- SEND PAGE ----------------
 @app.route("/send", methods=["GET"])
