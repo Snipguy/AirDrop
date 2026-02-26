@@ -6,10 +6,8 @@ import os, re, datetime
 import winsound
 import secrets
 import qrcode
-import io
-
-
-
+import socket ,time
+import webbrowser
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.backends import default_backend
@@ -17,7 +15,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 # ---------------- CONFIG ---------------
-APP_PIN = input("Set access PIN for phone:").strip()
+
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 # app.secret_key =  input("Set session password: ")
@@ -28,6 +26,25 @@ if not os.path.exists(UPLOAD_FOLDER):
 socketio = SocketIO(app, async_mode="threading")
 
 
+
+# --------- STARTUP SETUP ---------
+APP_PIN = input("🔐 Set access PIN for phone: ").strip()
+SESSION_TOKEN = secrets.token_urlsafe(24)
+
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Does not require internet — just finds LAN IP
+        s.connect(("192.168.0.1", 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"
+    finally:
+        s.close()
+    return ip
+
+LOCAL_IP = get_local_ip()
+BASE_URL = f"http://{LOCAL_IP}:5000"
 
 # generate one-time session token
 SESSION_TOKEN = secrets.token_urlsafe(16)
@@ -70,24 +87,40 @@ cert_file, key_file = generate_cert()
 # ---------------- LOGIN ----------------
 
 @app.route("/qr")
-def show_qr():
-    hostname = socket.gethostname()
-    local_ip = socket.gethostbyname(hostname)
-
-    url = f"https://{local_ip}:5000/connect?token={SESSION_TOKEN}"
-
+def generate_qr():
+    url = f"{BASE_URL}/connect?token={SESSION_TOKEN}"
     img = qrcode.make(url)
+    img.save("connect_qr.png")
 
-    file_path = "./qr/connect_qr.png"
+    print("\n📱 Scan this QR with your phone:")
+    print(url)
+    print("QR saved as connect_qr.png\n")
 
-    img.save(file_path, format="PNG")
 
-    print("\nQR Saved:", os.path.abspath(file_path))
-    print("Open this URL on phone: ", url)
-    
 
-    return send_file(file_path, mimetype="image/png")
+# def show_qr():
+#     hostname = socket.gethostname()
+#     local_ip = socket.gethostbyname(hostname)
 
+#     url = f"https://{local_ip}:5000/connect?token={SESSION_TOKEN}"
+
+#     img = qrcode.make(url)
+
+#     file_path = "./qr/connect_qr.png"
+
+#     img.save(file_path, format="PNG")
+
+#     print("\nQR Saved:", os.path.abspath(file_path))
+#     print("Open this URL on phone: ", url)
+
+
+#     return send_file(file_path, mimetype="image/png")
+
+@app.before_request
+def capture_user_agent():
+    ua = request.headers.get("User-Agent")
+    # Send UA to JS if you want
+    print("Connected device UA:", ua)
 
 @app.route("/connect")
 def connect():
@@ -96,7 +129,8 @@ def connect():
     if token != SESSION_TOKEN:
         abort(403)
 
-    return "Connected to session!"
+    session["logged_in"] = True
+    return redirect(url_for("send_page"))
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -108,16 +142,89 @@ def login():
             session["logged_in"] = True
             return redirect(url_for("send_page"))
         else:
-            return "Wrong PIN"
+            return '''
+            <script>alert("Wrong PIN"); window.location="/";</script>
+            '''
 
-    return '''
+    return f'''
+    <!DOCTYPE html>
     <html>
-    <body style="background:#121212;color:white;text-align:center;padding:40px;">
-        <h2>Enter PIN</h2>
-        <form method="POST">
-            <input type="password" name="password" placeholder="Enter PIN">
-            <button type="submit">Unlock</button>
-        </form>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{
+                margin:0;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                background: linear-gradient(135deg, #1e1e2f, #121212);
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                height:100vh;
+                color:white;
+            }}
+
+            .card {{
+                display:block;
+                background:#1c1c1c;
+                padding:40px 30px;
+                border-radius:25px;
+                width:90%;
+                max-width:400px;
+                text-align:center;
+                box-shadow:0 10px 40px rgba(0,0,0,0.6);
+            }}
+
+            h1 {{
+                margin-bottom:20px;
+                font-weight:600;
+            }}
+
+            input {{
+                width:90%;
+                padding:16px;
+                border:none;
+                border-radius:15px;
+                font-size:18px;
+                margin-top:10px;
+                background:#2a2a2a;
+                color:white;
+                text-align:center;
+                letter-spacing:3px;
+            }}
+
+            button {{
+                width:100%;
+                padding:16px;
+                border:none;
+                border-radius:15px;
+                margin-top:15px;
+                font-size:18px;
+                font-weight:600;
+                background:#00c853;
+                color:white;
+                cursor:pointer;
+            }}
+
+            button:active {{
+                transform:scale(0.97);
+            }}
+
+            .hint {{
+                margin-top:15px;
+                font-size:14px;
+                color:#aaa;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h1>🔐 Unlock PC</h1>
+            <form method="POST">
+                <input type="password" name="password" placeholder="Enter PIN" autofocus>
+                <button type="submit">Unlock</button>
+            </form>
+            <div class="hint">Scan QR from PC screen for instant login</div>
+        </div>
     </body>
     </html>
     '''
@@ -180,6 +287,9 @@ def send_page():
     </head>
     <body>
         <div class="card">
+            <div id="deviceName">
+                Device: {{ device_name }}
+            </div>
             <h2>Send to PC</h2>
             <textarea id="text" placeholder="Type text here"></textarea>
             <button class="button send" onclick="sendText()">Send Text</button>
@@ -190,6 +300,50 @@ def send_page():
 
             <button class="button logout" onclick="logout()">Logout</button>
             <div class="msg" id="message"></div>
+            <progress id="uploadProgress" value="0" max="100" style="width:100%;"></progress>
+
+            <script>
+            function uploadFile(file) {
+                let xhr = new XMLHttpRequest();
+                let formData = new FormData();
+                formData.append("file", file);
+
+                xhr.upload.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        let percent = (e.loaded / e.total) * 100;
+                        document.getElementById("uploadProgress").value = percent;
+                    }
+                };
+
+                xhr.open("POST", "/api/upload");
+                xhr.onload = function() {
+                    document.getElementById("message").innerText = "Upload completed!";
+                };
+                xhr.send(formData);
+            }
+            </script>
+            <div id="toast" style="
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 8px;
+                display: none;
+            ">
+                Sent!
+            </div>
+
+            <script>
+            function showToast(msg) {
+                let t = document.getElementById("toast");
+                t.innerText = msg;
+                t.style.display = "block";
+                setTimeout(() => t.style.display = "none", 2000);
+            }
+            </script>
         </div>
 
 <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
@@ -231,7 +385,13 @@ function uploadFile(file){
         .then(data=> document.getElementById("message").innerText=data.message);
 }
 
+// status indicator
+socket.on("status", (s) => {
+    document.getElementById("status").innerText = s;
+});
+
 // Logout
+
 function logout(){ window.location.href="/logout"; }
 </script>
 
@@ -246,7 +406,7 @@ def handle_message(data):
     pyperclip.copy(text)
 
     # Auto open URL
-    url_pattern = r"(https?://[^\s]+)"
+    url_pattern = r"(http?://[^\s]+)"
     match = re.search(url_pattern, text)
     if match:
         import webbrowser
@@ -255,6 +415,14 @@ def handle_message(data):
     winsound.MessageBeep(winsound.MB_OK)
     print("Received:", text)
     emit("receive_message", {"text": text}, broadcast=True)
+
+@socketio.on('start_text_send')
+def send_progress(data):
+    text = data["text"]
+    for i in range(len(text)):
+        time.sleep(0.01)
+        percent = int((i+1)/len(text)*100)
+        emit('progress_update', {'progress': percent})
 
 # ---------------- FILE UPLOAD ----------------
 @app.route("/api/upload", methods=["POST"])
@@ -276,15 +444,26 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+@socketio.on("connect")
+def client_connect():
+    print(f"📶 Client connected: {request.remote_addr}")
+    emit("status", {"message": "connected", "ip": request.remote_addr}, broadcast=True)
+
+@socketio.on("disconnect")
+def client_disconnect():
+    print(f"📴 Client disconnected: {request.remote_addr}")
+    emit("status", {"message": "disconnected"}, broadcast=True)
+
 # ---------------- RUN ----------------
-# socketio.run(app, host="10.152.59.118", port=5000, certfile=cert_file, keyfile=key_file, debug=True)
 
-
+webbrowser.open(BASE_URL)
 
 socketio.run(
     app,
-    host="0.0.0.0",
-    port=5000,
-    ssl_context=(cert_file, key_file),
+    # host="10.45.157.118",
+    # host=f"{LOCAL_IP}",
+    host=f"0.0.0.0",
+    use_reloader=False,
+    # ssl_context=(cert_file, key_file), # needs to be commented if there is no internet
     debug=True
 )
