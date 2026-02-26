@@ -13,6 +13,8 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from zeroconf import ServiceInfo, Zeroconf
+
 
 # ---------------- CONFIG ---------------
 
@@ -48,6 +50,20 @@ BASE_URL = f"http://{LOCAL_IP}:5000"
 
 # generate one-time session token
 SESSION_TOKEN = secrets.token_urlsafe(16)
+
+# ---------------- m DNS ----------------
+
+info = ServiceInfo(
+    "_http._tcp.local.",
+    "AirDropServer._http._tcp.local.",
+    addresses=[socket.inet_aton(LOCAL_IP)],
+    port=5000,
+    properties={},
+    server="airdrop.local."
+)
+zeroconf = Zeroconf()
+zeroconf.register_service(info)
+
 
 # ---------------- HTTPS CERT ----------------
 def generate_cert():
@@ -122,6 +138,8 @@ def capture_user_agent():
     # Send UA to JS if you want
     print("Connected device UA:", ua)
 
+    device = session.get("device_name", "Unknown Device")
+
 @app.route("/connect")
 def connect():
     token = request.args.get("token")
@@ -151,6 +169,12 @@ def login():
     <html>
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="manifest" href="/static/manifest.json">
+        <script>
+            if ('serviceWorker' in navigator) {{
+                navigator.serviceWorker.register('/static/sw.js');
+            }}
+        </script>
         <style>
             body {{
                 margin:0;
@@ -285,11 +309,36 @@ def send_page():
             #dropZone { border:2px dashed #555; padding:40px; text-align:center; border-radius:15px; margin-top:15px;}
         </style>
     </head>
+    <style>
+        .toast {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #444;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+    </style>
+    <div id="toast" class="toast"></div>
+    <script>
+        function showToast(msg) {
+            const toast = document.getElementById("toast");
+            toast.innerText = msg;
+            toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 2000);
+        }
+    </script>
+
     <body>
         <div class="card">
-            <div id="deviceName">
-                Device: {{ device_name }}
-            </div>
+            <div style="margin-bottom:10px; color:#ccc;">Connected: {{ device }}</div>
             <h2>Send to PC</h2>
             <textarea id="text" placeholder="Type text here"></textarea>
             <button class="button send" onclick="sendText()">Send Text</button>
@@ -300,28 +349,42 @@ def send_page():
 
             <button class="button logout" onclick="logout()">Logout</button>
             <div class="msg" id="message"></div>
-            <progress id="uploadProgress" value="0" max="100" style="width:100%;"></progress>
+            <progress id="uploadProgress" value="0" max="100" style="width: 100%; display:none;"></progress>
+            <div id="uploadProgressText" style="color:white; margin-top:8px;"></div>
 
             <script>
-            function uploadFile(file) {
-                let xhr = new XMLHttpRequest();
-                let formData = new FormData();
-                formData.append("file", file);
+                function uploadFile(file){
+                    const progressBar = document.getElementById("uploadProgress");
+                    const progressText = document.getElementById("uploadProgressText");
+                    progressBar.style.display = "block";
+                    progressBar.value = 0;
+                    progressText.innerText = "Uploading... 0%";
 
-                xhr.upload.onprogress = function(e) {
-                    if (e.lengthComputable) {
-                        let percent = (e.loaded / e.total) * 100;
-                        document.getElementById("uploadProgress").value = percent;
-                    }
-                };
+                    let xhr = new XMLHttpRequest();
+                    xhr.upload.onprogress = function(e){
+                        if(e.lengthComputable){
+                            let percent = Math.floor((e.loaded / e.total) * 100);
+                            progressBar.value = percent;
+                            progressText.innerText = "Uploading... " + percent + "%";
+                        }
+                    };
 
-                xhr.open("POST", "/api/upload");
-                xhr.onload = function() {
-                    document.getElementById("message").innerText = "Upload completed!";
-                };
-                xhr.send(formData);
-            }
+                    xhr.onload = function(){
+                        progressText.innerText = "Upload complete!";
+                        setTimeout(() => {
+                            progressBar.style.display = "none";
+                            progressText.innerText = "";
+                        }, 1500);
+                    };
+
+                    xhr.open("POST", "/api/upload");
+                    let formData = new FormData();
+                    formData.append("file", file);
+                    xhr.send(formData);
+                    showToast("File uploaded!");
+                }
             </script>
+
             <div id="toast" style="
                 position: fixed;
                 bottom: 20px;
@@ -350,16 +413,20 @@ def send_page():
 <script>
 var socket = io();
 
-socket.on("receive_message", function(data){
-    document.getElementById("message").innerText = "Received: " + data.text;
-});
-
 // Send text
 function sendText(){
     let text = document.getElementById("text").value;
-    socket.emit("send_message", {text: text});
+    document.getElementById("message").innerText = "Sending...";
+    document.getElementById("message").style.opacity = "0.6";
+    socket.emit("send_message", { text: text });
     document.getElementById("text").value = "";
 }
+
+socket.on("receive_message", function(data){
+    document.getElementById("message").innerText = "Sent: " + data.text;
+    document.getElementById("message").style.opacity = "1";
+});
+
 
 // Drag & Drop
 let dropZone = document.getElementById("dropZone");
@@ -376,14 +443,6 @@ document.getElementById("fileInput").addEventListener("change", function(){
     let file = this.files[0];
     uploadFile(file);
 });
-
-function uploadFile(file){
-    let formData = new FormData();
-    formData.append("file", file);
-    fetch("/api/upload", {method:"POST", body: formData})
-        .then(res=>res.json())
-        .then(data=> document.getElementById("message").innerText=data.message);
-}
 
 // status indicator
 socket.on("status", (s) => {
