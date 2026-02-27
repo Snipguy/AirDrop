@@ -17,7 +17,7 @@ from zeroconf import ServiceInfo, Zeroconf
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from flask import render_template
-
+import shutil
 
 # ---------------- CONFIG ---------------
 
@@ -49,25 +49,6 @@ class UploadHistory(db.Model):
     filename = db.Column(db.String, nullable=False)
     sender = db.Column(db.String, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-
-
-
-
-@app.route("/", methods=["GET", "POST"])
-def login():
-    db.create_all()
-    if request.method == "POST":
-        if request.form.get("password") == APP_PIN:
-            session["logged_in"] = True
-            return redirect(url_for("send_page"))
-    return render_template("login.html")
-
-@app.route("/send")
-def send_page():
-    if not session.get("logged_in"):
-        return redirect(url_for("login"))
-    return render_template("send.html")
-
 
 
 # --------- STARTUP SETUP ---------
@@ -189,10 +170,10 @@ def connect():
     session["logged_in"] = True
     return redirect(url_for("send_page"))
 
-
 @app.route("/", methods=["GET", "POST"])
 def login():
     db.create_all()
+
     if request.method == "POST":
         password = request.form.get("password")
 
@@ -200,117 +181,9 @@ def login():
             session["logged_in"] = True
             return redirect(url_for("send_page"))
         else:
-            return '''
-            <script>alert("Wrong PIN"); window.location="/";</script>
-            '''
+            return "<script>alert('Wrong PIN'); window.location='/';</script>"
 
-    return  f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="manifest" href="/static/manifest.json">
-        <script>
-            if ('serviceWorker' in navigator) {{
-                navigator.serviceWorker.register('/static/sw.js');
-            }}
-        </script>
-        <style>
-            body {{
-                margin:0;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                background: linear-gradient(135deg, #1e1e2f, #121212);
-                display:flex;
-                justify-content:center;
-                align-items:center;
-                height:100vh;
-                color:white;
-            }}
-
-            .card {{
-                display:block;
-                background:#1c1c1c;
-                padding:40px 30px;
-                border-radius:25px;
-                width:90%;
-                max-width:400px;
-                text-align:center;
-                box-shadow:0 10px 40px rgba(0,0,0,0.6);
-            }}
-
-            h1 {{
-                margin-bottom:20px;
-                font-weight:600;
-            }}
-
-            input {{
-                width:90%;
-                padding:16px;
-                border:none;
-                border-radius:15px;
-                font-size:18px;
-                margin-top:10px;
-                background:#2a2a2a;
-                color:white;
-                text-align:center;
-                letter-spacing:3px;
-            }}
-
-            button {{
-                width:100%;
-                padding:16px;
-                border:none;
-                border-radius:15px;
-                margin-top:15px;
-                font-size:18px;
-                font-weight:600;
-                background:#00c853;
-                color:white;
-                cursor:pointer;
-            }}
-
-            button:active {{
-                transform:scale(0.97);
-            }}
-
-            .hint {{
-                margin-top:15px;
-                font-size:14px;
-                color:#aaa;
-            }}
-
-            .ad-container {{
-                position: fixed;
-                bottom: 15px;
-                width: 100%;
-                display: flex;
-                justify-content: center;
-            }}
-
-            .ad-container img {{
-                max-width: 300px;
-                width: 80%;
-                border-radius: 12px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <div class="ad-container">
-                <a href="https://coffeebede.com/snipguy" target="_blank">
-                    <img src="https://coffeebede.ir/DashboardTemplateV2/app-assets/images/banner/default-yellow.svg">
-                </a>
-            </div>
-            <h1>🔐 Unlock PC</h1>
-            <form method="POST">
-                <input type="password" name="password" placeholder="Enter PIN" autofocus>
-                <button type="submit">Unlock</button>
-            </form>
-            <div class="hint">Scan QR from PC screen for instant login</div>
-        </div>
-    </body>
-    </html>
-    '''
+    return render_template("login.html")
 
 
 # @app.route("/", methods=["GET", "POST"])
@@ -347,191 +220,12 @@ def login():
 #     '''
 
 # ---------------- SEND PAGE ----------------
-@app.route("/send", methods=["GET"])
+@app.route("/send")
 def send_page():
     if not session.get("logged_in"):
         return redirect(url_for("login"))
-    return '''
-    <html>
-    <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body { font-family:'Segoe UI', sans-serif; background:#121212; color:white; padding:20px;}
-            .card { background:#1e1e1e; padding:25px; border-radius:20px; box-shadow:0 0 20px rgba(0,0,0,0.6);}
-            textarea { width:100%; height:120px; padding:10px; border-radius:12px; border:none; background:#2a2a2a; color:white; font-size:16px;}
-            .button { width:100%; padding:14px; border:none; border-radius:12px; margin-top:10px; font-weight:bold; font-size:18px; cursor:pointer; }
-            .send { background:#00c853; color:white; }
-            .upload { background:#2962ff; color:white; }
-            .logout { background:#d50000; color:white; }
-            button:hover { opacity:0.85; transition:0.2s; }
-            .msg { margin-top:15px; text-align:center; font-weight:bold; }
-            #dropZone { border:2px dashed #555; padding:40px; text-align:center; border-radius:15px; margin-top:15px;}
-        </style>
-    </head>
-    <style>
-        .toast {
-            position: fixed;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #444;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .toast.show {
-            opacity: 1;
-        }
-    </style>
-    <div id="toast" class="toast"></div>
-    <script>
-        function showToast(msg) {
-            const toast = document.getElementById("toast");
-            toast.innerText = msg;
-            toast.classList.add("show");
-            setTimeout(() => toast.classList.remove("show"), 2000);
-        }
-    </script>
+    return render_template("send.html")
 
-    <body>
-        <div>
-
-        </div>
-        <div class="card">
-            <div style="margin-bottom:10px; color:#ccc;">Connected: {{ device }}</div>
-            <h2>Send to PC</h2>
-            <textarea id="text" placeholder="Type text here"></textarea>
-            <button class="button send" onclick="sendText()">Send Text</button>
-
-            <div id="dropZone">Drag & Drop File Here</div>
-            <input type="file" id="fileInput" hidden>
-            <button class="button upload" onclick="document.getElementById('fileInput').click()">Choose File</button>
-
-            <button class="button logout" onclick="logout()">Logout</button>
-            <div class="msg" id="message"></div>
-            <progress id="uploadProgress" value="0" max="100" style="width: 100%; display:none;"></progress>
-            <div id="uploadProgressText" style="color:white; margin-top:8px;"></div>
-
-            <script>
-                function uploadFile(file) {
-                    let chunkSize = 5 * 1024 * 1024; // 5 MB chunks
-                    let totalChunks = Math.ceil(file.size / chunkSize);
-                    let fileId = Date.now() + "_" + file.name.replace(/ /g, "_");
-                    let currentChunk = 0;
-
-                    function sendNextChunk() {
-                        let start = currentChunk * chunkSize;
-                        let end = Math.min(start + chunkSize, file.size);
-                        let blob = file.slice(start, end);
-
-                        let formData = new FormData();
-                        formData.append("file_id", fileId);
-                        formData.append("chunk_index", currentChunk);
-                        formData.append("total_chunks", totalChunks);
-                        formData.append("chunk", blob);
-
-                        let xhr = new XMLHttpRequest();
-                        xhr.open("POST", "/api/upload_chunk", true);
-
-                        xhr.onload = function () {
-                            currentChunk++;
-                            let percent = Math.floor((currentChunk / totalChunks) * 100);
-                            document.getElementById("uploadProgress").value = percent;
-                            document.getElementById("uploadProgressText").innerText = "Uploading... " + percent + "%";
-
-                            if (currentChunk < totalChunks) {
-                                sendNextChunk();
-                            } else {
-                                document.getElementById("uploadProgressText").innerText = "Upload complete!";
-                                showToast("Upload finished");
-                            }
-                        };
-
-                        xhr.onerror = function () {
-                            showToast("Error uploading chunk " + currentChunk);
-                        };
-
-                        xhr.send(formData);
-                    }
-
-                    sendNextChunk(); // start upload
-                }
-            </script>
-
-            <div id="toast" style="
-                position: fixed;
-                bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: #4CAF50;
-                color: white;
-                padding: 10px 20px;
-                border-radius: 8px;
-                display: none;
-            ">
-                Sent!
-            </div>
-
-            <script>
-            function showToast(msg) {
-                let t = document.getElementById("toast");
-                t.innerText = msg;
-                t.style.display = "block";
-                setTimeout(() => t.style.display = "none", 2000);
-            }
-            </script>
-        </div>
-
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-<script>
-var socket = io();
-
-// Send text
-function sendText(){
-    let text = document.getElementById("text").value;
-    document.getElementById("message").innerText = "Sending...";
-    document.getElementById("message").style.opacity = "0.6";
-    socket.emit("send_message", { text: text });
-    document.getElementById("text").value = "";
-}
-
-socket.on("receive_message", function(data){
-    document.getElementById("message").innerText = "Sent: " + data.text;
-    document.getElementById("message").style.opacity = "1";
-});
-
-
-// Drag & Drop
-let dropZone = document.getElementById("dropZone");
-dropZone.addEventListener("dragover", e=>{ e.preventDefault(); dropZone.style.background="#333"; });
-dropZone.addEventListener("dragleave", e=>{ dropZone.style.background=""; });
-dropZone.addEventListener("drop", e=>{
-    e.preventDefault(); dropZone.style.background="";
-    let file = e.dataTransfer.files[0];
-    uploadFile(file);
-});
-
-// File upload
-document.getElementById("fileInput").addEventListener("change", function(){
-    let file = this.files[0];
-    uploadFile(file);
-});
-
-// status indicator
-socket.on("status", (s) => {
-    document.getElementById("status").innerText = s;
-});
-
-// Logout
-
-function logout(){ window.location.href="/logout"; }
-</script>
-
-    </body>
-    </html>
-    '''
 
 # ---------------- WEBSOCKET ----------------
 @socketio.on("send_message")
@@ -576,42 +270,44 @@ def upload_file():
     winsound.MessageBeep(winsound.MB_OK)
     return jsonify({"message":"File uploaded successfully!"})
 
-# Directory for chunk temp storage
+
+# ---------------- FILE CHUNK UPLOAD ----------------
 CHUNKS_FOLDER = "uploads/chunks"
 if not os.path.exists(CHUNKS_FOLDER):
     os.makedirs(CHUNKS_FOLDER)
 
+UPLOAD_PROGRESS = {}
+
 @app.route("/api/upload_chunk", methods=["POST"])
 def upload_chunk():
-    file_id = request.form.get("file_id")
-    chunk_index = request.form.get("chunk_index", type=int)
-    total_chunks = request.form.get("total_chunks", type=int)
-    chunk = request.files.get("chunk")
+    file_id = request.form["file_id"]
+    chunk_index = int(request.form["chunk_index"])
+    total_chunks = int(request.form["total_chunks"])
+    chunk = request.files["chunk"]
 
-    # Save chunk
-    file_chunk_path = os.path.join(CHUNKS_FOLDER, f"{file_id}_chunk_{chunk_index}")
-    chunk.save(file_chunk_path)
+    file_dir = os.path.join(CHUNKS_FOLDER, file_id)
+    os.makedirs(file_dir, exist_ok=True)
 
-    # If all chunks received, reassemble
-    existing_chunks = [
-        f for f in os.listdir(CHUNKS_FOLDER)
-        if f.startswith(f"{file_id}_chunk_")
-        
-    ]
+    chunk_path = os.path.join(file_dir, str(chunk_index))
+    chunk.save(chunk_path)
 
-    if len(existing_chunks) == total_chunks:
-        final_path = os.path.join(UPLOAD_FOLDER, file_id + "_" + secure_filename(chunk.filename))
-        with open(final_path, "wb") as final_file:
+    UPLOAD_PROGRESS.setdefault(file_id, set()).add(chunk_index)
+
+    if len(UPLOAD_PROGRESS[file_id]) == total_chunks:
+        final_path = os.path.join(UPLOAD_FOLDER, file_id)
+
+        with open(final_path, "wb") as f:
             for i in range(total_chunks):
-                part_path = os.path.join(CHUNKS_FOLDER, f"{file_id}_chunk_{i}")
-                with open(part_path, "rb") as part:
-                    final_file.write(part.read())
-                os.remove(part_path)  # remove chunk
-                db.session.add(UploadHistory(filename=final_path, sender=session.get("device_name", "Unknown")))
-                db.session.commit()
-        return jsonify({"status":"complete", "file": final_path})
+                with open(os.path.join(file_dir, str(i)), "rb") as part:
+                    f.write(part.read())
 
-    return jsonify({"status":"incomplete", "chunk_index": chunk_index})
+        shutil.rmtree(file_dir)
+        del UPLOAD_PROGRESS[file_id]
+
+        return jsonify({"status": "complete"})
+
+    return jsonify({"status": "incomplete"})
+
 
 # ---------------- LOGOUT ----------------
 @app.route("/logout")
@@ -638,7 +334,8 @@ def show_history():
     uploads = UploadHistory.query.order_by(UploadHistory.timestamp.desc()).all()
     return render_template("history.html", messages=messages, uploads=uploads)
 
-webbrowser.open(BASE_URL)
+# webbrowser.open(BASE_URL)
+webbrowser.open("http://airdrop.local:5000")
 
 socketio.run(
     app,
