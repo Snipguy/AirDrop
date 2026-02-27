@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="center">
+    <div class="card">
+        <h1>🔐 Unlock PC</h1>
+        <form method="POST">
+            <input type="password" name="password" placeholder="Enter PIN" autofocus>
+            <button type="submit">Unlock</button>
+        </form>
+        <div class="hint">Scan QR from PC screen for instant login</div>
+    </div>
+
+    <div class="ad-container">
+        <a href="https://coffeebede.com/snipguy" target="_blank">
+            <img src="https://coffeebede.ir/DashboardTemplateV2/app-assets/images/banner/default-yellow.svg">
+        </a>
+    </div>
+</div>
+{% endblock %}

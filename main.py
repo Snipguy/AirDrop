@@ -6,7 +6,7 @@ import os, re, datetime
 import winsound
 import secrets
 import qrcode
-import socket ,time
+import socket ,time, uuid
 import webbrowser
 from cryptography import x509
 from cryptography.x509.oid import NameOID
@@ -14,6 +14,9 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from zeroconf import ServiceInfo, Zeroconf
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.utils import secure_filename
+from flask import render_template
 
 
 # ---------------- CONFIG ---------------
@@ -26,6 +29,44 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 socketio = SocketIO(app, async_mode="threading")
+
+# --------- DataBase ---------
+
+
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///airdrop_history.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.String, nullable=False)
+    sender = db.Column(db.String, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+class UploadHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String, nullable=False)
+    sender = db.Column(db.String, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+
+
+
+@app.route("/", methods=["GET", "POST"])
+def login():
+    db.create_all()
+    if request.method == "POST":
+        if request.form.get("password") == APP_PIN:
+            session["logged_in"] = True
+            return redirect(url_for("send_page"))
+    return render_template("login.html")
+
+@app.route("/send")
+def send_page():
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+    return render_template("send.html")
 
 
 
@@ -48,8 +89,6 @@ def get_local_ip():
 LOCAL_IP = get_local_ip()
 BASE_URL = f"http://{LOCAL_IP}:5000"
 
-# generate one-time session token
-SESSION_TOKEN = secrets.token_urlsafe(16)
 
 # ---------------- m DNS ----------------
 
@@ -153,6 +192,7 @@ def connect():
 
 @app.route("/", methods=["GET", "POST"])
 def login():
+    db.create_all()
     if request.method == "POST":
         password = request.form.get("password")
 
@@ -164,7 +204,7 @@ def login():
             <script>alert("Wrong PIN"); window.location="/";</script>
             '''
 
-    return f'''
+    return  f'''
     <!DOCTYPE html>
     <html>
     <head>
@@ -238,10 +278,29 @@ def login():
                 font-size:14px;
                 color:#aaa;
             }}
+
+            .ad-container {{
+                position: fixed;
+                bottom: 15px;
+                width: 100%;
+                display: flex;
+                justify-content: center;
+            }}
+
+            .ad-container img {{
+                max-width: 300px;
+                width: 80%;
+                border-radius: 12px;
+            }}
         </style>
     </head>
     <body>
         <div class="card">
+            <div class="ad-container">
+                <a href="https://coffeebede.com/snipguy" target="_blank">
+                    <img src="https://coffeebede.ir/DashboardTemplateV2/app-assets/images/banner/default-yellow.svg">
+                </a>
+            </div>
             <h1>🔐 Unlock PC</h1>
             <form method="POST">
                 <input type="password" name="password" placeholder="Enter PIN" autofocus>
@@ -337,6 +396,9 @@ def send_page():
     </script>
 
     <body>
+        <div>
+
+        </div>
         <div class="card">
             <div style="margin-bottom:10px; color:#ccc;">Connected: {{ device }}</div>
             <h2>Send to PC</h2>
@@ -353,35 +415,48 @@ def send_page():
             <div id="uploadProgressText" style="color:white; margin-top:8px;"></div>
 
             <script>
-                function uploadFile(file){
-                    const progressBar = document.getElementById("uploadProgress");
-                    const progressText = document.getElementById("uploadProgressText");
-                    progressBar.style.display = "block";
-                    progressBar.value = 0;
-                    progressText.innerText = "Uploading... 0%";
+                function uploadFile(file) {
+                    let chunkSize = 5 * 1024 * 1024; // 5 MB chunks
+                    let totalChunks = Math.ceil(file.size / chunkSize);
+                    let fileId = Date.now() + "_" + file.name.replace(/ /g, "_");
+                    let currentChunk = 0;
 
-                    let xhr = new XMLHttpRequest();
-                    xhr.upload.onprogress = function(e){
-                        if(e.lengthComputable){
-                            let percent = Math.floor((e.loaded / e.total) * 100);
-                            progressBar.value = percent;
-                            progressText.innerText = "Uploading... " + percent + "%";
-                        }
-                    };
+                    function sendNextChunk() {
+                        let start = currentChunk * chunkSize;
+                        let end = Math.min(start + chunkSize, file.size);
+                        let blob = file.slice(start, end);
 
-                    xhr.onload = function(){
-                        progressText.innerText = "Upload complete!";
-                        setTimeout(() => {
-                            progressBar.style.display = "none";
-                            progressText.innerText = "";
-                        }, 1500);
-                    };
+                        let formData = new FormData();
+                        formData.append("file_id", fileId);
+                        formData.append("chunk_index", currentChunk);
+                        formData.append("total_chunks", totalChunks);
+                        formData.append("chunk", blob);
 
-                    xhr.open("POST", "/api/upload");
-                    let formData = new FormData();
-                    formData.append("file", file);
-                    xhr.send(formData);
-                    showToast("File uploaded!");
+                        let xhr = new XMLHttpRequest();
+                        xhr.open("POST", "/api/upload_chunk", true);
+
+                        xhr.onload = function () {
+                            currentChunk++;
+                            let percent = Math.floor((currentChunk / totalChunks) * 100);
+                            document.getElementById("uploadProgress").value = percent;
+                            document.getElementById("uploadProgressText").innerText = "Uploading... " + percent + "%";
+
+                            if (currentChunk < totalChunks) {
+                                sendNextChunk();
+                            } else {
+                                document.getElementById("uploadProgressText").innerText = "Upload complete!";
+                                showToast("Upload finished");
+                            }
+                        };
+
+                        xhr.onerror = function () {
+                            showToast("Error uploading chunk " + currentChunk);
+                        };
+
+                        xhr.send(formData);
+                    }
+
+                    sendNextChunk(); // start upload
                 }
             </script>
 
@@ -464,6 +539,10 @@ def handle_message(data):
     text = data.get("text")
     pyperclip.copy(text)
 
+    sender = session.get("device_name", "Unknown")
+    db.session.add(Message(content=text, sender=sender))
+    db.session.commit()
+
     # Auto open URL
     url_pattern = r"(http?://[^\s]+)"
     match = re.search(url_pattern, text)
@@ -497,6 +576,43 @@ def upload_file():
     winsound.MessageBeep(winsound.MB_OK)
     return jsonify({"message":"File uploaded successfully!"})
 
+# Directory for chunk temp storage
+CHUNKS_FOLDER = "uploads/chunks"
+if not os.path.exists(CHUNKS_FOLDER):
+    os.makedirs(CHUNKS_FOLDER)
+
+@app.route("/api/upload_chunk", methods=["POST"])
+def upload_chunk():
+    file_id = request.form.get("file_id")
+    chunk_index = request.form.get("chunk_index", type=int)
+    total_chunks = request.form.get("total_chunks", type=int)
+    chunk = request.files.get("chunk")
+
+    # Save chunk
+    file_chunk_path = os.path.join(CHUNKS_FOLDER, f"{file_id}_chunk_{chunk_index}")
+    chunk.save(file_chunk_path)
+
+    # If all chunks received, reassemble
+    existing_chunks = [
+        f for f in os.listdir(CHUNKS_FOLDER)
+        if f.startswith(f"{file_id}_chunk_")
+        
+    ]
+
+    if len(existing_chunks) == total_chunks:
+        final_path = os.path.join(UPLOAD_FOLDER, file_id + "_" + secure_filename(chunk.filename))
+        with open(final_path, "wb") as final_file:
+            for i in range(total_chunks):
+                part_path = os.path.join(CHUNKS_FOLDER, f"{file_id}_chunk_{i}")
+                with open(part_path, "rb") as part:
+                    final_file.write(part.read())
+                os.remove(part_path)  # remove chunk
+                db.session.add(UploadHistory(filename=final_path, sender=session.get("device_name", "Unknown")))
+                db.session.commit()
+        return jsonify({"status":"complete", "file": final_path})
+
+    return jsonify({"status":"incomplete", "chunk_index": chunk_index})
+
 # ---------------- LOGOUT ----------------
 @app.route("/logout")
 def logout():
@@ -513,7 +629,14 @@ def client_disconnect():
     print(f"📴 Client disconnected: {request.remote_addr}")
     emit("status", {"message": "disconnected"}, broadcast=True)
 
+
+
 # ---------------- RUN ----------------
+@app.route("/history")
+def show_history():
+    messages = Message.query.order_by(Message.timestamp.desc()).all()
+    uploads = UploadHistory.query.order_by(UploadHistory.timestamp.desc()).all()
+    return render_template("history.html", messages=messages, uploads=uploads)
 
 webbrowser.open(BASE_URL)
 

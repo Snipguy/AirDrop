@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>History</title></head>
+<body>
+<h2>Messages</h2>
+<ul>
+  {% for msg in messages %}
+    <li>{{msg.timestamp}}: {{ msg.sender }} → {{ msg.content }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Files</h2>
+<ul>
+  {% for up in uploads %}
+    <li>{{up.timestamp}}: {{ up.sender }} → {{ up.filename }}</li>
+  {% endfor %}
+</ul>
+</body>
+</html>
