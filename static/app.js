@@ -109,6 +109,7 @@ function uploadFile(file) {
             currentChunk++;
 
             let percent = Math.floor((currentChunk / totalChunks) * 100);
+            uploadedBytes = currentChunk * 8388608; // need to check if this calculates the speed currectly
             updateProgress(percent, uploadedBytes);
 
             if (progressBar) progressBar.value = percent;
