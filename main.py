@@ -1,4 +1,3 @@
-import socket
 from flask import Flask, request, redirect, url_for, session, jsonify, abort, send_file
 from flask_socketio import SocketIO, emit
 import pyperclip
