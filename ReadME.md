@@ -46,25 +46,39 @@ project/
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
-cd YOUR_REPO
-
+git clone https://github.com/snipguy/LAN_AirDrop.git
+cd LAN_AirDrop
+```
 2️⃣ Create Virtual Environment (Recommended)
+```bash
 python -m venv venv
 source venv/bin/activate  # Mac/Linux
 venv\Scripts\activate     # Windows
+```
 3️⃣ Install Dependencies
+```bash
 pip install -r requirements.txt
+```
+If Your can't acsess the main Pypi you can use the megan backup servers
+```bash
+pip install -r requirements.txt --index-url https://hub.megan.ir/pypi/simple
+```
+
 ▶ Run the App
+```bash
 python main.py
+```
 
 Then open:
 
 http://127.0.0.1:5000
+http://airdrop.local:5000
 
 To access from another device on LAN:
 
 http://YOUR_LOCAL_IP:5000
+http://airdrop.local:5000
+
 📲 PWA Support
 
 To enable installable PWA:
@@ -98,18 +112,20 @@ If you find this project useful, consider supporting it:
 
 👉 https://coffeebede.com/snipguy
 
-📜 License
+## If you find this project useful, consider supporting it:
+👉 https://coffeebede.com/snipguy
+
+# 📜 License
 
 MIT License
 
-
 ---
+
+
 
 # 💎 Optional: Add .gitignore
 
 You should also create:
-
-
 .gitignore
 
 

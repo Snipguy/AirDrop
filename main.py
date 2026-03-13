@@ -338,9 +338,9 @@ webbrowser.open("http://airdrop.local:5000")
 
 socketio.run(
     app,
-    # host="10.45.157.118",
-    # host=f"{LOCAL_IP}",
-    host=f"0.0.0.0",
+    # host="169.254.9.176",
+    host=f"{LOCAL_IP}",
+    # host=f"0.0.0.0",
     use_reloader=False,
     # ssl_context=(cert_file, key_file), # needs to be commented if there is no internet
     debug=True
