@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Connecting...</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+        <script>
+            // Dynamically set the base URL to the detected IP
+            var serverBaseUrl = "{{ BASE_URL_IP }}"; 
+            var socket = io.connect(serverBaseUrl); 
+            
+            // --- Authentication Logic ---
+            socket.on('connect', function() {
+                console.log('Socket connected to server.');
+                // Send the token and PIN to authenticate
+                socket.emit('authenticate', {token: '{{ token }}', pin: '{{ pin }}'}); 
+                alert('Connected via Socket.IO! Authenticating...');
+            });
+
+            socket.on('auth_success', function(data) {
+                alert('Authentication successful!');
+                // Redirect to your main app page where your app.js takes over
+                window.location.href = '/app'; // Example redirect
+            });
+
+            socket.on('auth_fail', function(data) {
+                alert('Authentication failed: ' + data.message);
+                console.error("Authentication failed:", data.message);
+                // Optionally redirect to a page asking for PIN again, or show error
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Socket disconnected.');
+                alert('Disconnected from server.');
+                // Handle disconnection - maybe attempt to reconnect or show error message
+            });
+        </script>
+    </head>
+    <body>
+        <h1>Connecting to server...</h1>
+        <p>If you are not redirected automatically, please check the console for errors.</p>
+    </body>
+</html>

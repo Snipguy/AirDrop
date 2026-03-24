@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connect Your Device</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 700px; margin: 40px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
+        h1 { color: #0056b3; margin-bottom: 20px; }
+        .ip-address { font-size: 1.5em; font-weight: bold; color: #e67e22; margin-bottom: 25px; padding: 10px; background-color: #fdf2e7; border-left: 5px solid #e67e22; display: inline-block;}
+        .qr-code-section { margin-top: 30px; }
+        .qr-code-section img { max-width: 250px; height: auto; border: 1px solid #ddd; padding: 5px; background: white; }
+        .instructions { margin-top: 25px; font-size: 0.95em; color: #555; }
+        .instructions p { margin-bottom: 10px; }
+        .note { font-size: 0.85em; color: #888; margin-top: 15px; }
+        .footer { margin-top: 40px; font-size: 0.8em; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Connect Your Phone</h1>
+        <p>Please use your phone to connect to the server.</p>
+        
+        <div class="ip-address">
+            Server IP: <a href="{{ BaseUrl }}" target="_blank">{{ IP }}</a>
+        </div>
+
+        <div class="qr-code-section">
+            <p>Scan the QR code below with your phone's camera app or a QR scanner:</p>
+            <img src="{{ qr_code_url }}" alt="Qr File">
+            <p class="note">If the QR code doesn't scan, try entering the IP address directly.</p>
+        </div>
+
+        <div class="instructions">
+            <h3>Steps:</h3>
+            <p>1. Open your phone's camera app and point it at the QR code above.</p>
+            <p>2. Tap the notification that appears to open the link in your phone's browser.</p>
+            <p>3. Alternatively, manually enter <code>{{ IP }}/connect?token={{ token }}</code> in your phone's browser.</p>
+            <p>4. Enter the PIN code: <strong>{{ pin }}</strong></p>
+        </div>
+        <div class="footer">
+            Server running on {{ IP }}
+        </div>
+    </div>
+</body>
+</html>

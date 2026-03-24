@@ -27,11 +27,9 @@ UPLOAD_FOLDER = "uploads"
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-socketio = SocketIO(app, async_mode="threading")
+socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
 
 # --------- DataBase ---------
-
-
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///airdrop_history.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -184,7 +182,6 @@ def login():
 
     return render_template("login.html")
 
-
 # @app.route("/", methods=["GET", "POST"])
 # def login():
 #     if request.method == "POST":
@@ -333,15 +330,43 @@ def show_history():
     uploads = UploadHistory.query.order_by(UploadHistory.timestamp.desc()).all()
     return render_template("history.html", messages=messages, uploads=uploads)
 
-# webbrowser.open(BASE_URL)
-webbrowser.open("http://airdrop.local:5000")
 
-socketio.run(
-    app,
-    # host="169.254.9.176",
-    host=f"{LOCAL_IP}",
-    # host=f"0.0.0.0",
-    use_reloader=False,
-    # ssl_context=(cert_file, key_file), # needs to be commented if there is no internet
-    debug=True
-)
+@app.route("/info", methods=["GET", "POST"])
+def show_info():
+    QR_CODE_FILENAME = "connect_qr.png"
+
+    return render_template(
+        "info.html",
+        token = SESSION_TOKEN,
+        BaseUrl = BASE_URL,
+        IP = LOCAL_IP,
+        qr_code_url = QR_CODE_FILENAME,
+        pin = APP_PIN
+    )
+
+
+def run_server():
+    # webbrowser.open(BASE_URL)
+    webbrowser.open("http://airdrop.local:5000/info")
+
+    print("-" * 60)
+    print(f"⚡️ Server starting...")
+    print(f"   Local IP Address: {LOCAL_IP}")
+    print(f"   Base URL (IP): {BASE_URL}")
+    print(f"   Access URL: http://airdrop.local:5000")
+    print(f"   QR Code saved as: connect-qr.png")
+    print("-" * 60)
+
+    socketio.run(
+        app,
+        host="10.186.31.118",
+        # host=f"{LOCAL_IP}",
+        # host=f"0.0.0.0",
+        use_reloader=False,
+        # ssl_context=(cert_file, key_file), # needs to be commented if there is no internet
+        debug=True
+    )
+
+
+if __name__ == "__main__":
+    run_server()
