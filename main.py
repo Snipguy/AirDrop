@@ -359,9 +359,9 @@ def run_server():
 
     socketio.run(
         app,
-        host="10.186.31.118",
+        # host="172.20.32.1",
         # host=f"{LOCAL_IP}",
-        # host=f"0.0.0.0",
+        host=f"0.0.0.0",
         use_reloader=False,
         # ssl_context=(cert_file, key_file), # needs to be commented if there is no internet
         debug=True
