@@ -167,6 +167,13 @@ def connect():
     session["logged_in"] = True
     return redirect(url_for("send_page"))
 
+# New endpoint: PC → PHONE
+@app.route("/send_to_phone", methods=["POST"])
+def send_to_phone():
+    data = request.json.get("data")
+    print("PC is sending:", data)
+    return jsonify({"status": "received by phone"}), 200
+
 @app.route("/", methods=["GET", "POST"])
 def login():
     db.create_all()
