@@ -1,0 +1,20 @@
+{% extends "base.html" %} {% block content %}
+
+<script src="{{ url_for('static', filename='phoneserver.js') }}"></script>
+<div class="center">
+    <div class="card">
+        <h1>🔐 Unlock Phone</h1>
+        <form method="POST">
+            <input type="password" name="password" placeholder="Enter PIN" autofocus style="margin-bottom: 15px;">
+            <button type="submit">Unlock</button>
+        </form>
+        <div class="hint">Scan QR from PC screen for instant login</div>
+    </div>
+
+    <div class="ad-container subtle-don">
+        <a href="https://coffeebede.com/snipguy" target="_blank">
+            <img src="./static/default-yellow.svg" />
+        </a>
+    </div>
+</div>
+{% endblock %}

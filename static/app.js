@@ -245,3 +245,59 @@ function playSuccessSound() {
     audio.volume = 0.4;
     audio.play();
 }
+
+// ==========================
+// PHONE SIDE APP
+// ==========================
+
+let receivedFileChunks = [];
+let currentFileMetadata = null;
+
+socket.on('file_metadata', (metadata) => {
+    currentFileMetadata = metadata;
+    receivedFileChunks = [];
+    showToast(`Receiving file: ${metadata.name} (${formatBytes(metadata.size)})`);
+});
+
+socket.on('file_chunk', (data) => {
+    if (!currentFileMetadata) return;
+    
+    // Convert hex back to binary
+    const chunk = new Uint8Array(data.chunk.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+    receivedFileChunks[data.index] = chunk;
+    
+    // Update progress
+    const progress = ((data.index + 1) / data.total) * 100;
+    updateDownloadProgress(progress);
+    
+    // When all chunks received
+    if (receivedFileChunks.filter(c => c).length === data.total) {
+        assembleAndSaveFile();
+    }
+});
+
+function assembleAndSaveFile() {
+    const blob = new Blob(receivedFileChunks, { type: currentFileMetadata.type });
+    const url = URL.createObjectURL(blob);
+    
+    // Create download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentFileMetadata.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    showToast(`File saved: ${currentFileMetadata.name}`);
+    currentFileMetadata = null;
+    receivedFileChunks = [];
+}
+
+
+// Register service worker for offline capability
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then(() => {
+        console.log('Service Worker registered');
+    });
+}
+

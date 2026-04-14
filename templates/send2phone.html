@@ -1,0 +1,71 @@
+{% extends "base.html" %} {% block content %}
+
+
+<script src="{{ url_for('static', filename='phoneserver.js') }}"></script>
+
+<div class="card">
+    <div id="pc-to-phone-section" style="display: none;">
+        <h3>Send Files to Phone</h3>
+        <input type="file" id="pcFilePicker" multiple>
+        <button onclick="sendFileToPhone()">Send Selected Files</button>
+        <div id="pcFilesList"></div>
+    </div>
+
+    <script>
+        function sendFileToPhone() {
+            const files = document.getElementById('pcFilePicker').files;
+            for (let file of files) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    socket.emit('send_file_from_pc', {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        data: e.target.result
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        }
+    </script>
+
+
+    <div class="top-bar">
+        <h2>📡 AirDrop</h2>
+
+        <div class="don-bar">
+            <a href="https://coffeebede.com/snipguy" target="_blank">
+                <img class="img-fluid" src=".\static\default-yellow.svg" />
+            </a>
+        </div>
+
+        <div class="actions">
+            <button class="icon-btn" onclick="toggleTheme()" style="margin-top: 0px;">🌗</button>
+            <a href="/phone_viewer">
+                <button class="icon-btn logout" style="margin-top: 0px;">🚪</button>
+            </a>
+        </div>
+    </div>
+
+    <div class="section">
+        <textarea id="text" placeholder="✉️ Send a quick message..."></textarea>
+        <button onclick="sendText()">🚀 Send Text</button>
+    </div>
+
+    <div class="section">
+        
+        <div class="progress-container">
+            <div id="uploadBar"></div>
+        </div>
+        <div id="successCheck" class="checkmark">✔</div>
+        <div id="uploadInfo" style="font-size:12px; opacity:0.7; margin-top:6px;"></div>
+    </div>
+
+    <div class="section">
+        <h3>📜 Recent Files</h3>
+        <ul id="fileHistory"></ul>
+    </div>
+
+</div>
+
+{% endblock %}

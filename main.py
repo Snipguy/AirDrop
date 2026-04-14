@@ -1,4 +1,6 @@
-from flask import Flask, request, redirect, url_for, session, jsonify, abort, send_file
+import math
+import mimetypes
+from flask import Flask, request, redirect, send_from_directory, url_for, session, jsonify, abort, send_file
 from flask_socketio import SocketIO, emit
 import pyperclip
 import os, re, datetime
@@ -17,6 +19,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from flask import render_template
 import shutil
+from flask_cors import CORS
 
 # ---------------- CONFIG ---------------
 
@@ -49,7 +52,8 @@ class UploadHistory(db.Model):
 
 
 # --------- STARTUP SETUP ---------
-APP_PIN = input("🔐 Set access PIN for phone: ").strip()
+# APP_PIN = input("🔐 Set access PIN for phone: ").strip()
+APP_PIN = "4444" # for dev branch
 SESSION_TOKEN = secrets.token_urlsafe(24)
 
 def get_local_ip():
@@ -130,25 +134,6 @@ def generate_qr():
     print("QR saved as connect_qr.png\n")
 
 
-
-# def show_qr():
-#     hostname = socket.gethostname()
-#     local_ip = socket.gethostbyname(hostname)
-
-#     url = f"https://{local_ip}:5000/connect?token={SESSION_TOKEN}"
-
-#     img = qrcode.make(url)
-
-#     file_path = "./qr/connect_qr.png"
-
-#     img.save(file_path, format="PNG")
-
-#     print("\nQR Saved:", os.path.abspath(file_path))
-#     print("Open this URL on phone: ", url)
-
-
-#     return send_file(file_path, mimetype="image/png")
-
 @app.before_request
 def capture_user_agent():
     ua = request.headers.get("User-Agent")
@@ -168,8 +153,11 @@ def connect():
     return redirect(url_for("send_page"))
 
 # New endpoint: PC → PHONE
-@app.route("/send_to_phone", methods=["POST"])
+@app.route("/send_to_phone", methods=["POST", "GET"])
 def send_to_phone():
+    if request.method == "GET":
+        return render_template("send2phone.html")
+
     data = request.json.get("data")
     print("PC is sending:", data)
     return jsonify({"status": "received by phone"}), 200
@@ -189,38 +177,6 @@ def login():
 
     return render_template("login.html")
 
-# @app.route("/", methods=["GET", "POST"])
-# def login():
-#     if request.method == "POST":
-#         password = request.form.get("password")
-#         if password == app.secret_key:
-#             session["logged_in"] = True
-#             return redirect(url_for("send_page"))
-#         else:
-#             return "Wrong password"
-#     return '''
-#     <html>
-#     <head>
-#         <meta name="viewport" content="width=device-width, initial-scale=1">
-#         <style>
-#             body { font-family: 'Segoe UI', sans-serif; background:#121212; color:white; text-align:center; padding:40px;}
-#             .card { background:#1e1e1e; padding:30px; border-radius:20px; box-shadow:0 0 25px rgba(0,0,0,0.6);}
-#             input, button { width:100%; padding:15px; margin-top:10px; border-radius:12px; border:none; font-size:18px;}
-#             button { font-weight:bold; }
-#             button:hover { opacity:0.85; transition:0.2s; }
-#         </style>
-#     </head>
-#     <body>
-#         <div class="card">
-#             <h2>Login</h2>
-#             <form method="POST">
-#                 <input type="password" name="password" placeholder="Enter password">
-#                 <button type="submit">Login</button>
-#             </form>
-#         </div>
-#     </body>
-#     </html>
-#     '''
 
 # ---------------- SEND PAGE ----------------
 @app.route("/send")
@@ -258,6 +214,176 @@ def send_progress(data):
         time.sleep(0.01)
         percent = int((i+1)/len(text)*100)
         emit('progress_update', {'progress': percent})
+
+# ---------------- PC ==> Phone ----------------
+
+SHARED_FOLDER = r"E:\GitHub\AirDrop\uploads"
+
+
+@app.route('/api/status', methods=['GET'])
+def server_status():
+    return jsonify({
+        'status': 'online',
+        'server_time': datetime.now().isoformat(),
+        'clients_connected': len(socketio.server.manager.rooms.get('/', {}))
+    }), 200
+
+@app.route('/api/network/info', methods=['GET'])
+def network_info():
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    
+    return jsonify({
+        'hostname': hostname,
+        'local_ip': local_ip,
+        'port': 5000,
+        'websocket_url': f'ws://{local_ip}:5000'
+    }), 200
+
+@app.route("/api/mobile/recive", methods=["POST"])
+def mobile_recive():
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+
+        device_id = data.get('device_id')
+        payload = data.get('data')
+        
+        # Process the data (store, broadcast, etc.)
+        print(f"Received from mobile {device_id}: {payload}")
+
+        socketio.emit('mobile_data', {
+            'device_id': device_id,
+            'data': payload,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Data received',
+            'device_id': device_id
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@socketio.on('mobile_connect')
+def handle_mobile_connect(data):
+    device_id = data.get('device_id')
+    device_type = data.get('device_type', 'mobile')
+    
+    print(f"Mobile device connected: {device_id}")
+    
+    if 'mobile_devices' not in session:
+        session['mobile_devices'] = []
+    
+    session['mobile_devices'].append({
+        'id': device_id,
+        'type': device_type,
+        'connected_at': datetime.now().isoformat()
+    })
+
+
+    emit('mobile_connected', {
+        'status': 'connected',
+        'server_time': datetime.now().isoformat()
+    })
+
+@socketio.on('mobile_data_stream')
+def handle_mobile_stream(data):
+    socketio.emit('stream_update', {
+        'source': 'mobile',
+        'data': data,
+        'timestamp': datetime.now().isoformat()
+    })
+
+
+
+@socketio.on("send_file_to_phone")
+def handle_file_to_phone(data):
+    if not session.get("logged_in"):
+        return
+
+    file_path = data.get("file_path")
+    if not os.path.exists(file_path):
+        return {"error": "File not found"}
+
+
+    chunk_size = 1024 * 1024  # 1MB chunks
+    file_name = os.path.basename(file_path)
+    file_size = os.path.getsize(file_path)
+
+    emit("file_metadata", {
+        "name": file_name,
+        "size": file_size,
+        "type": mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    }, room=request.sid)
+    
+    with open(file_path, "rb") as f:
+        chunk_index = 0
+        while chunk := f.read(chunk_size):
+            emit("file_chunk", {
+                "chunk": chunk.hex(),
+                "index": chunk_index,
+                "total": math.ceil(file_size / chunk_size)
+            }, room=request.sid)
+            chunk_index += 1
+
+
+@app.route("/phone", methods=["GET", "POST"])
+def login_to_phone():
+    db.create_all()
+
+    if request.method == "POST":
+        password = request.form.get("password")
+
+        if password == APP_PIN:
+            session["logged_in"] = True
+            return redirect(url_for("send_to_phone"))
+        else:
+            return "<script>alert('Wrong PIN'); window.location='/phone';</script>"
+
+    return render_template("login2phone.html")
+
+# PC → Phone endpoint
+@app.route("/api/download/<filename>", methods=["GET"])
+def download_file(filename):
+    if not session.get("logged_in"):
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found"}), 404
+
+    return send_from_directory(SHARED_FOLDER, filename, as_attachment=True)
+
+
+@app.route("/phone_viewer")
+def phone_server():
+    files = os.listdir(SHARED_FOLDER)
+    return render_template("phone_viewer.html", files=files)
+
+
+@socketio.on("request_file_list")
+def handle_file_list_request():
+    if not session.get("logged_in"):
+        return
+
+    files = []
+    for filename in os.listdir(UPLOAD_FOLDER):
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        if os.path.isfile(file_path):
+            files.append({
+                "name": filename,
+                "size": os.path.getsize(file_path),
+                "modified": os.path.getmtime(file_path),
+                "type": mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+            })
+
+    emit("file_list", {"files": files}, room=request.sid)
+
 
 # ---------------- FILE UPLOAD ----------------
 @app.route("/api/upload", methods=["POST"])
@@ -354,7 +480,7 @@ def show_info():
 
 def run_server():
     # webbrowser.open(BASE_URL)
-    webbrowser.open("http://airdrop.local:5000/info")
+    # webbrowser.open("http://airdrop.local:5000/info")
 
     print("-" * 60)
     print(f"⚡️ Server starting...")
@@ -373,6 +499,12 @@ def run_server():
         # ssl_context=(cert_file, key_file), # needs to be commented if there is no internet
         debug=True
     )
+
+
+    CORS(app, resources={
+        r"/api/*": {"origins": "*"},
+        r"/socket.io/*": {"origins": "*"}
+    })
 
 
 if __name__ == "__main__":
