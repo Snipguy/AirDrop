@@ -20,6 +20,8 @@ from werkzeug.utils import secure_filename
 from flask import render_template
 import shutil
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
+
 
 # ---------------- CONFIG ---------------
 
@@ -215,7 +217,7 @@ def send_progress(data):
         percent = int((i+1)/len(text)*100)
         emit('progress_update', {'progress': percent})
 
-# ---------------- PC ==> Phone ----------------
+# !!---------------- PC ==> Phone ----------------
 
 SHARED_FOLDER = r"E:\GitHub\AirDrop\uploads"
 
@@ -301,36 +303,54 @@ def handle_mobile_stream(data):
 
 
 
-@socketio.on("send_file_to_phone")
-def handle_file_to_phone(data):
-    if not session.get("logged_in"):
-        return
+# --- Helper function to get file metadata ---
+def get_file_metadata(folder_path):
+    files_data = []
+    try:
+        for filename in os.listdir(folder_path):
+            filepath = os.path.join(folder_path, filename)
+            if os.path.isfile(filepath):
+                file_stat = os.stat(filepath)
+                mod_time = datetime.datetime.fromtimestamp(file_stat.st_mtime)
+                file_size = file_stat.st_size # Size in bytes
 
-    file_path = data.get("file_path")
-    if not os.path.exists(file_path):
-        return {"error": "File not found"}
+                # Determining file type for icon mapping
+                _, ext = os.path.splitext(filename)
+                ext = ext.lower()
+                file_type = "unknown"
+                if ext in ['.pdf']:
+                    file_type = "pdf"
+                elif ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff']:
+                    file_type = "image"
+                elif ext in ['.zip', '.rar', '.tar', '.gz', '.7z']:
+                    file_type = "archive"
+                elif ext in ['.mp3', '.wav', '.aac', '.flac', '.ogg']:
+                    file_type = "audio"
+                elif ext in ['.mp4', '.avi', '.mov', '.wmv', '.mkv']:
+                    file_type = "video"
+                elif ext in ['.txt', '.doc', '.docx', '.odt', '.rtf']:
+                    file_type = "document"
+
+                files_data.append({
+                    "name": filename,
+                    "size_bytes": file_size,
+                    "modified_timestamp": mod_time.timestamp(),
+                    "modified_date": mod_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    "type": file_type,
+                    "extension": ext
+                })
+    except Exception as e:
+        print(f"Error accessing shared folder: {e}")
+        return []
+    return files_data
+
+# --- Routes ---
 
 
-    chunk_size = 1024 * 1024  # 1MB chunks
-    file_name = os.path.basename(file_path)
-    file_size = os.path.getsize(file_path)
-
-    emit("file_metadata", {
-        "name": file_name,
-        "size": file_size,
-        "type": mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    }, room=request.sid)
-    
-    with open(file_path, "rb") as f:
-        chunk_index = 0
-        while chunk := f.read(chunk_size):
-            emit("file_chunk", {
-                "chunk": chunk.hex(),
-                "index": chunk_index,
-                "total": math.ceil(file_size / chunk_size)
-            }, room=request.sid)
-            chunk_index += 1
-
+@app.route("/viewer")
+def viewer():
+    all_files_data = get_file_metadata(SHARED_FOLDER)
+    return render_template("viewer.html", files_data=all_files_data)
 
 @app.route("/phone", methods=["GET", "POST"])
 def login_to_phone():
@@ -341,13 +361,13 @@ def login_to_phone():
 
         if password == APP_PIN:
             session["logged_in"] = True
-            return redirect(url_for("send_to_phone"))
+            return redirect(url_for("viewer"))
         else:
             return "<script>alert('Wrong PIN'); window.location='/phone';</script>"
 
     return render_template("login2phone.html")
 
-# PC → Phone endpoint
+#!! PC → Phone endpoint
 @app.route("/api/download/<filename>", methods=["GET"])
 def download_file(filename):
     if not session.get("logged_in"):
@@ -358,12 +378,6 @@ def download_file(filename):
         return jsonify({"error": "File not found"}), 404
 
     return send_from_directory(SHARED_FOLDER, filename, as_attachment=True)
-
-
-@app.route("/phone_viewer")
-def phone_server():
-    files = os.listdir(SHARED_FOLDER)
-    return render_template("phone_viewer.html", files=files)
 
 
 @socketio.on("request_file_list")
