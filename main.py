@@ -154,16 +154,6 @@ def connect():
     session["logged_in"] = True
     return redirect(url_for("send_page"))
 
-# New endpoint: PC → PHONE
-@app.route("/send_to_phone", methods=["POST", "GET"])
-def send_to_phone():
-    if request.method == "GET":
-        return render_template("send2phone.html")
-
-    data = request.json.get("data")
-    print("PC is sending:", data)
-    return jsonify({"status": "received by phone"}), 200
-
 @app.route("/", methods=["GET", "POST"])
 def login():
     db.create_all()
@@ -352,8 +342,8 @@ def viewer():
     all_files_data = get_file_metadata(SHARED_FOLDER)
     return render_template("viewer.html", files_data=all_files_data)
 
-@app.route("/phone", methods=["GET", "POST"])
-def login_to_phone():
+@app.route("/pc", methods=["GET", "POST"])
+def login_to_pc():
     db.create_all()
 
     if request.method == "POST":
@@ -363,9 +353,9 @@ def login_to_phone():
             session["logged_in"] = True
             return redirect(url_for("viewer"))
         else:
-            return "<script>alert('Wrong PIN'); window.location='/phone';</script>"
+            return "<script>alert('Wrong PIN'); window.location='/pc';</script>"
 
-    return render_template("login2phone.html")
+    return render_template("login2pc.html")
 
 #!! PC → Phone endpoint
 @app.route("/api/download/<filename>", methods=["GET"])

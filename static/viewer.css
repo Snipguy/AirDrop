@@ -1,0 +1,351 @@
+/* --- Global Styles --- */
+body {
+    margin: 0;
+    padding: 0;
+    background: #121212;
+    color: #fff;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.5;
+}
+
+h1 {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 28px;
+    font-weight: 600;
+    color: #eee;
+}
+
+/* --- Container & List --- */
+.container {
+    width: 95%;
+    max-width: 800px;
+    margin: 20px auto;
+    background: #1e1e1e;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.4);
+}
+
+/* --- Loading Animation --- */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(18, 18, 18, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.loading-spinner {
+    border: 6px solid #333;
+    border-top: 6px solid #00bcd4;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* --- Search & Sort Bar --- */
+.ptr-indicator {
+    margin-top: -30px;
+}
+
+.controls-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 10px;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+}
+
+.search-box {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    margin-right: 10px;
+    min-width: 180px; /* Prevent shrinking too much */
+}
+
+.search-box input {
+    flex-grow: 1;
+    background: #3a3a3a;
+    border: none;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 15px;
+    outline: none;
+}
+.search-box input::placeholder {
+    color: #aaa;
+}
+.search-box .fa-search {
+    margin-left: 10px;
+    color: #aaa;
+}
+
+.sort-dropdown {
+    position: relative;
+    margin-left: 10px;
+}
+
+.sort-dropdown button {
+    background: #3a3a3a;
+    border: none;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    display: flex;
+    align-items: center;
+}
+
+.sort-dropdown button .fa-sort {
+    margin-right: 5px;
+}
+
+.sort-dropdown-menu {
+    position: absolute;
+    right: 0;
+    background: #2a2a2a;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    z-index: 10;
+    display: none; /* Hidden by default, shown by JS */
+    min-width: 180px;
+}
+
+.sort-dropdown-menu.show {
+    display: block;
+}
+
+.sort-dropdown-menu a {
+    color: #fff;
+    padding: 10px 15px;
+    text-decoration: none;
+    display: block;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.sort-dropdown-menu a:hover {
+    background: #3a3a3a;
+}
+.sort-dropdown-menu a i { /* Icons for sort directions */
+    margin-right: 8px;
+    color: #00bcd4;
+}
+
+/* --- File Item Styles --- */
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #2a2a2a;
+    padding: 12px 10px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    transition: background 0.2s, transform 0.1s;
+    /* cursor: pointer; /* Make the whole item tappable */
+}
+
+.file-item:hover {
+    background: #333333;
+}
+.file-item:active { /* Mobile tap feedback */
+    transform: scale(0.98);
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    flex-grow: 1; /* Take up available space */
+    margin-right: 10px; /* Space before download button */
+    min-width: 0; /* Crucial for text overflow */
+}
+
+.file-icon {
+    font-size: 22px;
+    margin-right: 12px;
+    color: #00bcd4;
+    flex-shrink: 0; /* Icon shouldn't shrink */
+}
+
+.file-details {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Crucial for text overflow */
+}
+
+.file-name {
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #e0e0e0;
+}
+
+.file-meta {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 2px;
+}
+.file-meta .size {
+    margin-right: 10px;
+}
+.file-meta .date {
+    white-space: nowrap; /* Prevent date from breaking */
+}
+
+.download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #00bcd4, #0097a7);
+    color: #000;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 16px;
+    text-decoration: none;
+    transition: all 0.25s ease;
+    box-shadow: 0 0 8px rgba(0, 188, 212, 0.4);
+}
+
+.download-btn:hover {
+    background: linear-gradient(135deg, #05d0ea, #00acc1);
+    box-shadow: 0 0 15px rgba(0, 188, 212, 0.7);
+    transform: translateY(-2px);
+}
+
+.download-btn:active {
+    transform: scale(0.96);
+    box-shadow: 0 0 6px rgba(0, 188, 212, 0.5);
+}
+
+.download-btn i {
+    color: #000;
+    font-size: 18px;
+}
+
+#download-icon {
+    max-width: 40px;
+    max-height: 25px;
+}
+
+/* --- Empty State --- */
+.empty {
+    text-align: center;
+    padding: 30px 20px;
+    color: #ccc;
+    font-size: 16px;
+}
+
+/* --- Media Queries for Responsiveness --- */
+@media (max-width: 768px) {
+    .controls-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .search-box {
+        margin-right: 0;
+        margin-bottom: 10px;
+        min-width: unset;
+    }
+    .sort-dropdown {
+        margin-left: 0;
+        width: 100%;
+    }
+    .sort-dropdown button {
+        width: 100%;
+    }
+    .sort-dropdown-menu {
+        position: relative; /* Adjust for column layout */
+        width: 100%;
+        right: auto;
+    }
+    h1 {
+        font-size: 24px;
+    }
+    .file-item {
+        padding: 10px 8px;
+    }
+    .file-icon {
+        font-size: 20px;
+        margin-right: 10px;
+    }
+    .file-name {
+        font-size: 14px;
+    }
+    .file-meta {
+        font-size: 11px;
+    }
+    .download-btn {
+        font-size: 13px;
+        padding: 7px 12px;
+    }
+}
+
+/* --- Pull to Refresh Indicator (will be shown/hidden by JS) --- */
+.ptr-indicator {
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    color: #aaa;
+    padding: 5px;
+    max-height: 50px;
+    transition: margin-top 0.3s ease-out;
+    background: #1e1e1e;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.ptr-indicator.pulling {
+    margin-top: 0;
+}
+.ptr-indicator.refreshing {
+    margin-top: 0;
+}
+.ptr-indicator i {
+    margin-right: 10px;
+    font-size: 20px;
+}
+
+.ad-container {
+    justify-content: center;
+    align-content: center;
+}
+
+.subtle-don {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.subtle-don img {
+    max-height: 80px;
+    object-fit: contain;
+    opacity: 0.85;
+    transition: 0.2s ease;
+}
+
+.subtle-don img:hover {
+    opacity: 1;
+}
