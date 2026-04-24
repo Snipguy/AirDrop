@@ -1,4 +1,12 @@
-const filesData = JSON.parse(JSON.stringify(files_data | tojson | safe )); // Clone initial data
+// pc.js
+
+console.log("pc.js loaded"); // Should now appear if the script tag is correct
+
+// Checking if filesData exists to avoid errors if the script runs before the inline script
+if (typeof filesData !== 'undefined') {
+    console.log("Files data received:", filesData);
+}
+
 let currentFiles = [...filesData]; // The list that will be manipulated
 let sortBy = 'name'; // Default sort
 let sortOrder = 'asc'; // Default order
@@ -79,8 +87,7 @@ function renderFileList(filesToRender) {
                     </div>
                 </div>
             </div>
-            <button class="preview-btn" onclick="previewFile('/uploads/${file.name}')">Preview</button>
-            <a class="download-btn" href="/api/download/${encodeURIComponent(file.name)}" download>
+             <a class="download-btn" href="/api/download/${encodeURIComponent(file.name)}" download>
                 <i class="fa fa-download"></i>
             </a>
         `;
@@ -128,7 +135,7 @@ function updateDisplay() {
     currentFiles = sortFiles(filtered, sortBy, sortOrder);
     renderFileList(currentFiles);
 }
-
+console.log("1ST")
 // --- Event Listeners ---
 
 // Search Input
@@ -274,43 +281,124 @@ console.log("Hello Kitty")
 // --- Initial Call ---
 window.addEventListener('load', initialize);
 
-function previewFile(filename) {
+// function previewFile(filename) {
+//     const previewModal = document.getElementById('previewModal');
+//     const previewBody = document.getElementById('previewBody');
+
+//     if (!previewModal || !previewBody) {
+//         console.error("Error: previewModal or previewBody element not found in the DOM.");
+//         alert("Error: Preview functionality is not set up correctly.");
+//         return;
+//     }
+
+//     const fileUrl = `/api/download/${filename}`; // Ensure this matches your server's route
+//     const fileExt = filename.split('.').pop().toLowerCase();
+
+//     previewBody.innerHTML = ''; // Clear previous content
+//     previewModal.style.display = 'flex'; // Show modal
+
+//     if (['png','jpg','jpeg','gif','webp'].includes(fileExt)) {
+//         previewBody.innerHTML = `<img src="${fileUrl}" style="max-width:100%; height:auto;" alt="File Preview" />`;
+//         console.log(`Loading image: ${fileUrl}`);
+//     } else if (fileExt === 'txt') {
+//         console.log(`Fetching text file: ${fileUrl}`);
+//         fetch(fileUrl)
+//             .then(res => {
+//                 if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+//                 return res.text();
+//             })
+//             .then(text => {
+//                 const escaped = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+//                 previewBody.innerHTML = `<pre style="white-space:pre-wrap; font-family: monospace; margin: 0;">${escaped}</pre>`;
+//             })
+//             .catch(err => {
+//                 console.error("Error previewing text file:", err);
+//                 previewBody.innerHTML = `<p style="color:red;">Error: Could not preview file. ${err.message}</p>`;
+//             });
+//     } else {
+//         previewBody.innerHTML = `<p>File type (${fileExt}) not supported for preview.</p>`;
+//     }
+// }
+
+// Function to show the preview modal and render content
+function previewFile(event, fileInfo) {
+    // Prevent default button action if it's a link or something that navigates
+    if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+    }
+
+
+    console.log("Previewing file:", fileInfo);
+
     const previewModal = document.getElementById('previewModal');
     const previewBody = document.getElementById('previewBody');
 
     if (!previewModal || !previewBody) {
-        console.error("Error: previewModal or previewBody element not found in the DOM.");
-        alert("Error: Preview functionality is not set up correctly.");
+        console.error("Preview modal or preview body element not found!");
         return;
     }
 
-    const fileUrl = `/api/download/${filename}`; // Ensure this matches your server's route
-    const fileExt = filename.split('.').pop().toLowerCase();
+    let previewContent = '';
+    const fileName = fileInfo.name;
+    const fileType = fileInfo.type; // Assuming you have a 'type' field like 'image', 'pdf', 'document', etc.
+    const fileUrl = `/api/files/${fileName}`; // Construct the URL to fetch the file content/path
 
-    previewBody.innerHTML = ''; // Clear previous content
-    previewModal.style.display = 'flex'; // Show modal
-
-    if (['png','jpg','jpeg','gif','webp'].includes(fileExt)) {
-        previewBody.innerHTML = `<img src="${fileUrl}" style="max-width:100%; height:auto;" alt="File Preview" />`;
-        console.log(`Loading image: ${fileUrl}`);
-    } else if (fileExt === 'txt') {
-        console.log(`Fetching text file: ${fileUrl}`);
+    // --- Logic to determine preview content based on file type ---
+    if (fileType.startsWith('image')) {
+        // For images, use an img tag
+        previewContent = `<img src="${fileUrl}" alt="${fileName}" style="max-width: 100%; max-height: 80vh; display: block; margin: auto;">`;
+    } else if (fileType === 'pdf') {
+        // For PDFs, embed using an iframe or object tag
+        previewContent = `<iframe src="${fileUrl}" style="width:100%; height:80vh; border:none;"></iframe>`;
+        // Or using an object tag:
+        // previewContent = `<object data="${fileUrl}" type="application/pdf" width="100%" height="80vh">This browser does not support PDFs. Please download the file.</object>`;
+    } else if (fileType.startsWith('text') || fileType === 'document' || fileType === 'plain') {
+        // For text files or documents, you might fetch content and display it
+        // NOTE: Fetching large text files directly might be slow.
+        // A better approach for very large files might be to link to them for download.
+        // For simplicity here, we'll assume a simple text fetch.
         fetch(fileUrl)
-            .then(res => {
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                return res.text();
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
             })
             .then(text => {
-                const escaped = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                previewBody.innerHTML = `<pre style="white-space:pre-wrap; font-family: monospace; margin: 0;">${escaped}</pre>`;
+                // Use a preformatted block for text files to preserve formatting
+                previewBody.innerHTML = `<pre style="white-space: pre-wrap; word-wrap: break-word; max-height: 80vh; overflow: auto;">${escapeHtml(text)}</pre>`;
+                previewModal.style.display = 'flex'; // Make modal visible AFTER content is set
             })
-            .catch(err => {
-                console.error("Error previewing text file:", err);
-                previewBody.innerHTML = `<p style="color:red;">Error: Could not preview file. ${err.message}</p>`;
+            .catch(error => {
+                console.error('Error fetching text file:', error);
+                previewBody.innerHTML = `<p>Error loading preview for ${fileName}. <a href="${fileUrl}" download>Download file</a> instead.</p>`;
+                previewModal.style.display = 'flex';
             });
-    } else {
-        previewBody.innerHTML = `<p>File type (${fileExt}) not supported for preview.</p>`;
+        return; // Exit here as fetch is asynchronous
+    } else if (fileType.startsWith('video')) {
+         previewContent = `<video controls src="${fileUrl}" style="max-width: 100%; max-height: 80vh; display: block; margin: auto;"></video>`;
+    } else if (fileType.startsWith('audio')) {
+         previewContent = `<audio controls src="${fileUrl}" style="width: 100%; display: block; margin: auto;"></audio>`;
     }
+    else {
+        // For unsupported types or archives, provide a link to download
+        previewContent = `<p>Preview not available for this file type (${fileType}).</p><a href="${fileUrl}" download style="display: block; margin-top: 15px;">Download ${fileName}</a>`;
+    }
+
+    // Set the content for non-async previews
+    previewBody.innerHTML = previewContent;
+    // Make the modal visible AFTER setting content
+    previewModal.style.display = 'flex'; // Use 'flex' to center content if you're using flexbox for alignment
+}
+
+// Helper function to escape HTML characters for displaying text content safely
+function escapeHtml(unsafe) {
+    return unsafe
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
 }
 
 function closePreview() {
@@ -340,38 +428,37 @@ document.addEventListener('keydown', function(event) {
 });
 
 
-function previewFile(filename) {
-    const previewModal = document.getElementById('previewModal');
-    const previewBody = document.getElementById('previewBody');
+// function previewFile(filename) {
+//     const previewModal = document.getElementById('previewModal');
+//     const previewBody = document.getElementById('previewBody');
 
-    const fileExt = filename.split('.').pop().toLowerCase();
+//     const fileExt = filename.split('.').pop().toLowerCase();
 
-    if (['png','jpg','jpeg','gif','webp'].includes(fileExt)) {
-        previewBody.innerHTML = `<img src="${filename}" style="max-width:100%; height:auto;" />`;
-    } else if (fileExt === 'txt') {
-        fetch(filename)
-            .then(res => res.text())
-            .then(text => {
-                const escaped = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                previewBody.innerHTML = `<pre style="white-space:pre-wrap;">${escaped}</pre>`;
-            })
-            .catch(err => {
-                previewBody.innerHTML = `<p style="color:red;">Unable to load file: ${err}</p>`;
-            });
-    } else {
-        previewBody.innerHTML = `<p>This file type cannot be previewed.</p>`;
-    }
+//     if (['png','jpg','jpeg','gif','webp'].includes(fileExt)) {
+//         previewBody.innerHTML = `<img src="${filename}" style="max-width:100%; height:auto;" />`;
+//     } else if (fileExt === 'txt') {
+//         fetch(filename)
+//             .then(res => res.text())
+//             .then(text => {
+//                 const escaped = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+//                 previewBody.innerHTML = `<pre style="white-space:pre-wrap;">${escaped}</pre>`;
+//             })
+//             .catch(err => {
+//                 previewBody.innerHTML = `<p style="color:red;">Unable to load file: ${err}</p>`;
+//             });
+//     } else {
+//         previewBody.innerHTML = `<p>This file type cannot be previewed.</p>`;
+//     }
 
-    previewModal.style.display = 'flex';
-}
+//     previewModal.style.display = 'flex';
+// }
 
-function closePreview() {
-    document.getElementById('previewModal').style.display = 'none';
-}
+// function closePreview() {
+//     document.getElementById('previewModal').style.display = 'none';
+// }
 
 
 // --- Placeholder for Multi-select (JS logic would go here) ---
-// You'd need to:
 // 1. Add a checkbox or tap-and-hold gesture to select files.
 // 2. Show a "bar" at the bottom with "Download Selected", "Delete Selected" etc.
 // 3. Modify the .file-item click listener to toggle selection mode.

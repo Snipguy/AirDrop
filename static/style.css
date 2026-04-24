@@ -86,8 +86,9 @@ body {
 }
 
 textarea {
+    padding-top: 14px;
+    padding-bottom: 14px;
     width: 100%;
-    padding: 14px;
     border-radius: 14px;
     border: none;
     background: #2a2a2a;

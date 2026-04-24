@@ -339,6 +339,9 @@ def get_file_metadata(folder_path):
 
 @app.route("/viewer")
 def viewer():
+    if not session.get("logged_in"):
+        return jsonify({"error": "Unauthorized"}), 401
+
     all_files_data = get_file_metadata(SHARED_FOLDER)
     return render_template("viewer.html", files_data=all_files_data)
 
