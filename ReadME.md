@@ -121,18 +121,3 @@ MIT License
 
 ---
 
-
-
-# 💎 Optional: Add .gitignore
-
-You should also create:
-.gitignore
-
-
-With:
-
-```txt
-venv/
-__pycache__/
-uploads/
-.env
