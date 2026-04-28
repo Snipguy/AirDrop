@@ -7,7 +7,7 @@ import os, re, datetime
 import winsound
 import secrets
 import qrcode
-import socket ,time, uuid
+import socket ,time
 import webbrowser
 from cryptography import x509
 from cryptography.x509.oid import NameOID
@@ -20,12 +20,11 @@ from werkzeug.utils import secure_filename
 from flask import render_template
 import shutil
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
-
+from waitress import serve
 
 # ---------------- CONFIG ---------------
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 app.secret_key = secrets.token_hex(32)
 # app.secret_key =  input("Set session password: ")
 UPLOAD_FOLDER = "uploads"
@@ -125,11 +124,10 @@ cert_file, key_file = generate_cert()
 
 # ---------------- LOGIN ----------------
 
-@app.route("/qr")
 def generate_qr():
     url = f"{BASE_URL}/connect?token={SESSION_TOKEN}"
     img = qrcode.make(url)
-    img.save("connect_qr.png")
+    img.save("static/connect_qr.png")
 
     print("\n📱 Scan this QR with your phone:")
     print(url)
@@ -336,6 +334,10 @@ def get_file_metadata(folder_path):
 
 # --- Routes ---
 
+@app.route("/api/files")
+def files():
+    newFilesData = get_file_metadata(SHARED_FOLDER)
+    return newFilesData
 
 @app.route("/viewer")
 def viewer():
@@ -473,6 +475,7 @@ def show_history():
 
 @app.route("/info", methods=["GET", "POST"])
 def show_info():
+    generate_qr()
     QR_CODE_FILENAME = "connect_qr.png"
 
     return render_template(

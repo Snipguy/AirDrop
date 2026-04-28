@@ -19,6 +19,7 @@ const sortButton = document.getElementById('sortButton');
 const sortMenu = document.getElementById('sortMenu');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const ptrIndicator = document.getElementById('ptrIndicator');
+const checkCircle = document.getElementById('indicator');
 
 // --- Helper Functions ---
 function formatBytes(bytes, decimals = 2) {
@@ -130,9 +131,12 @@ function filterFiles(files, searchTerm) {
 }
 
 // --- Update Display ---
-function updateDisplay() {
+function updateDisplay(filesData) {
+    console.log('Setting Filtered');
     let filtered = filterFiles(filesData, searchInput.value);
+    console.log('Setting Current Files');
     currentFiles = sortFiles(filtered, sortBy, sortOrder);
+    console.log('Rendering Files list');
     renderFileList(currentFiles);
 }
 console.log("1ST")
@@ -149,9 +153,7 @@ sortButton.addEventListener('click', (e) => {
     isSortMenuOpen = !isSortMenuOpen;
     sortMenu.classList.toggle('show', isSortMenuOpen);
     if (isSortMenuOpen) {
-        sortButton.querySelector('.fa-sort').style.color = '#00bcd4'; // Highlight button
-    } else {
-        sortButton.querySelector('.fa-sort').style.color = '#fff';
+        sortButton.querySelector('.fas').style.color = '#00bcd4'; // Highlight button
     }
 });
 
@@ -174,15 +176,16 @@ sortMenu.querySelectorAll('a').forEach(link => {
         sortOrder = order;
 
         // Update button text and icon
-        sortButton.innerHTML = `<i class="${order === 'asc' ? 'fa-sort-numeric-down' : 'fa-sort-numeric-up'}"></i> ${criteria.charAt(0).toUpperCase() + criteria.slice(1)} (${order === 'asc' ? 'Asc' : 'Desc'})`;
+        sortButton.innerHTML = `<i class="${order === 'asc' ? 'fas fa-sort-numeric-down' : 'fas fa-sort-numeric-up'}"></i> ${criteria.charAt(0).toUpperCase() + criteria.slice(1)} (${order === 'asc' ? 'Asc' : 'Desc'})`;
         // If criteria is name, use alpha icons
         if (criteria === 'name') {
-            sortButton.innerHTML = `<i class="${order === 'asc' ? 'fa-sort-alpha-down' : 'fa-sort-alpha-up'}"></i> ${criteria.charAt(0).toUpperCase() + criteria.slice(1)} (${order === 'asc' ? 'Asc' : 'Desc'})`;
+            sortButton.innerHTML = `<i class="${order === 'asc' ? 'fas fa-sort-alpha-down' : 'fas fa-sort-alpha-up'}"></i> ${criteria.charAt(0).toUpperCase() + criteria.slice(1)} (${order === 'asc' ? 'Asc' : 'Desc'})`;
         }
-            sortButton.querySelector('i').style.color = '#00bcd4'; // Highlight active sort
+        sortButton.querySelector('i').style.color = '#00bcd4'; // Highlight active sort
 
-        updateDisplay();
+        updateDisplay(filesData);
         isSortMenuOpen = false; // Close menu
+        sortButton.querySelector('.fas').style.color = '#fff';
         sortMenu.classList.remove('show');
     });
 });
@@ -190,11 +193,8 @@ sortMenu.querySelectorAll('a').forEach(link => {
 // --- Initial Display & Setup ---
 function initialize() {
     // Initial sort based on default values
-    console.log("Soft Kitty")
     currentFiles = sortFiles(filesData, sortBy, sortOrder);
-    console.log("Warm Kitty")
     renderFileList(currentFiles);
-    console.log("Little ball of fur")
     loadingOverlay.style.opacity = '0';
     setTimeout(() => loadingOverlay.style.display = 'none', 500); // Fade out and hide
 }
@@ -248,29 +248,42 @@ document.addEventListener('touchend', () => {
         refreshIndicator.querySelector('span').textContent = 'Refreshing...';
         refreshIndicator.style.marginTop = '0px';
 
-        // --- Simulate a refresh ---
-        // In a real app, you'd fetch new data from the server here
-        // For now, we'll just re-render the current data
+        // --- Refreshing ---
         setTimeout(() => {
-            // Here you would re-fetch files_data from the server if it were dynamic
-            // e.g., fetch('/api/files').then(res => res.json()).then(newFilesData => { ... });
-            
-            // For this example, we just re-sort/filter the existing data to show it works
-            updateDisplay(); 
-            
-            refreshIndicator.classList.remove('refreshing');
-            refreshIndicator.classList.remove('pulling');
-            refreshIndicator.querySelector('i').className = 'fas fa-check-circle'; // Success indicator
-            refreshIndicator.querySelector('span').textContent = ' Refreshed!';
-            
+            fetch('/api/files')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                console.log('/api/files has been set');
+                return response.json()
+            })
+            .then(newFilesData => {
+                const filesData = newFilesData
+                console.log('filesData has been set');
+                // For this example, we just re-sort/filter the existing data to show it works
+                console.log('updating filesData');
+                updateDisplay(filesData); 
+                console.log('Done with UpdateDisplay');
+    
+                refreshIndicator.classList.remove('refreshing');
+                refreshIndicator.classList.remove('pulling');
+                refreshIndicator.querySelector('i').className = 'fas fa-check-circle'; // Success indicator
+                refreshIndicator.querySelector('span').textContent = ' Refreshed!';
+                checkCircle.style.transform = 'rotate(0deg)';
+            })
+            .catch(error => {
+                console.error('Error fetching new files data:', error);
+            });
+
             setTimeout(() => {
-                refreshIndicator.style.marginTop = '-60px'; // Hide after a delay
+                refreshIndicator.style.marginTop = '-35px'; // Hide after a delay
             }, 1000);
 
         }, 1500); // Simulate network latency
     } else {
         // If not pulled enough, just reset
-        refreshIndicator.style.marginTop = '-60px';
+        refreshIndicator.style.marginTop = '-35px';
         refreshIndicator.querySelector('i').className = 'fas fa-chevron-down';
         refreshIndicator.querySelector('span').textContent = 'Pull to refresh';
     }
