@@ -46,7 +46,7 @@ project/
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/snipguy/LAN_AirDrop.git
+git clone https://github.com/snipguy/AirDrop.git
 cd LAN_AirDrop
 ```
 2️⃣ Create Virtual Environment (Recommended)
